@@ -46,10 +46,6 @@ on:
         required: true
         description: application id
         default: "platform-devsecops"
-      description:
-        required: true
-        description: application id
-        default: "PagoPush Customer service"
 
       # Optional monorepo mode (if set, create PR instead of creating a new repo)
       monorepoUrl:
@@ -116,7 +112,7 @@ jobs:
               "javaVersion": "${{ inputs.java_version }}",
               "serviceOwner": "${{ inputs.owner }}",
               "serviceTitle": "${{ inputs.system_id }} ${{ inputs.component_name }} Service",
-              "serviceDescription": "${{ inputs.description }}",
+              "serviceDescription": "xddddd",
               "serviceRepository": "${{ inputs.system_id }}-${{ inputs.component_name }}-service",
               "requiresDatabase": "no",
               "requiresMessaging": "no",
