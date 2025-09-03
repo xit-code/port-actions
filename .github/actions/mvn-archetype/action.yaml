@@ -21,8 +21,14 @@ inputs:
   organizationName:
     description: "The name of the organization to create the repository in"
     required: true
-  mvnArchetypeArtifactId:
+  archetypeGroupId:
+    description: "The mvn archetype group id to use to populate the repository"
+    required: true
+  archetypeArtifactId:
     description: "The mvn archetype to use to populate the repository"
+    required: true
+  archetypeVersion:
+    description: "The mvn archetype version to use to populate the repository"
     required: true
   portUserInputs:
     description: "Port user inputs to came from triggering the action"
@@ -38,6 +44,19 @@ inputs:
     description: "Whether to create a Port entity for the repository"
     required: false
     default: "true"
+  monorepoUrl:
+    description: 'The URL of the monorepo to create the new service in, specify it alongside scaffoldDirectory to open a new pull-request in the monorepo'
+    required: false
+  scaffoldDirectory:
+    description: 'The directory to scaffold the cookiecutter template in'
+    required: false
+  mavenOptionsJson:
+    required: false
+    description: "mvnOptions"
+  mavenExtraArgs:
+    required: false
+    description: "extra args"
+    default: ""
 runs:
   using: docker
   image: Dockerfile
