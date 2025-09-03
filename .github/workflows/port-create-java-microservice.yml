@@ -30,10 +30,6 @@ on:
         required: true
         description: application id
         default: "mdp"
-      component_name:
-        required: true
-        description: application id
-        default: "pagopush-customer"
       version:
         required: true
         description: application id
@@ -61,6 +57,23 @@ jobs:
       - name: Checkout (only needed when using local actions)
         uses: actions/checkout@v4
 
+      # NEW: compose <system_id>-<service_name>-service (lowercase, kebab-case, max 100 chars)
+      - name: Compose repository name
+        id: repo_name
+        shell: bash
+        run: |
+          set -euo pipefail
+          sys='${{ inputs.system_id }}'
+          svc='${{ inputs.service_name }}'
+          name="${sys}-${svc}-service"
+          # lowercase + sanitize to [a-z0-9-], collapse repeats, trim edges
+          name="$(echo "$name" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+          # limit to 100 chars (GitHub repo name limit)
+          name="${name:0:100}"
+          echo "value=$name" >> "$GITHUB_OUTPUT"
+
       - name: Run mvn-archetype action (local)
         uses: ./.github/actions/mvn-archetype
         with:
@@ -68,7 +81,7 @@ jobs:
           token: ${{ secrets.ORG_ADMIN_TOKEN }}
           githubUrl: https://api.github.com
           organizationName: ${{ env.ORG_NAME }}
-          repositoryName: ${{ inputs.service_name }}
+          repositoryName: ${{ steps.repo_name.outputs.value }}
 
           # Port (optional)
           portClientId: ${{ secrets.PORT_CLIENT_ID }}
@@ -93,13 +106,13 @@ jobs:
             {
               "groupId": "pe.interbank",
               "application": "${{ inputs.system_id }}",
-              "service": "${{ inputs.component_name }}",
+              "service": "${{ inputs.service_name }}",
               "version": "${{ inputs.version }}",
               "javaVersion": "${{ inputs.java_version }}",
               "serviceOwner": "${{ inputs.owner }}",
-              "serviceTitle": "${{ inputs.system_id }} ${{ inputs.component_name }} Service",
+              "serviceTitle": "${{ inputs.system_id }} ${{ inputs.service_name }} Service",
               "serviceDescription": "xddddd",
-              "serviceRepository": "${{ inputs.system_id }}-${{ inputs.component_name }}-service",
+              "serviceRepository": "${{ inputs.system_id }}-${{ inputs.service_name }}-service",
               "requiresDatabase": "no",
               "requiresMessaging": "no",
               "requiresService": "no",
@@ -116,8 +129,8 @@ jobs:
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           baseUrl: https://api.getport.io
           operation: UPSERT
-          identifier: "${{ inputs.service_name }}_service"
-          title: "${{ inputs.service_name }} Service"
+          identifier: "${{ inputs.service_name }}-service"
+          title: "${{ inputs.system_id }} ${{ inputs.service_name }} Service"
           blueprint: "service"
           relations: |
             {
