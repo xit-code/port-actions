@@ -82,6 +82,7 @@ jobs:
           githubUrl: https://api.github.com
           organizationName: ${{ env.ORG_NAME }}
           repositoryName: ${{ steps.repo_name.outputs.value }}
+          githubTeamName: ${{ inputs.system_id }}
 
           # Port (optional)
           portClientId: ${{ secrets.PORT_CLIENT_ID }}

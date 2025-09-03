@@ -18,6 +18,9 @@ inputs:
   repositoryName:
     description: "The name of the repository to create"
     required: true
+  githubTeamName:
+    description: "The name of the GitHub Team"
+    required: true
   organizationName:
     description: "The name of the organization to create the repository in"
     required: true

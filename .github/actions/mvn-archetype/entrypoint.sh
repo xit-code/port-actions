@@ -11,6 +11,7 @@ port_run_id="${INPUT_PORTRUNID:-}"
 github_token="${INPUT_TOKEN:-}"
 blueprint_identifier="${INPUT_BLUEPRINTIDENTIFIER:-}"
 repository_name="${INPUT_REPOSITORYNAME:-}"
+github_team_name="${INPUT_GITHUBTEAMNAME:-}"
 org_name="${INPUT_ORGANIZATIONNAME:-}"
 create_port_entity="${INPUT_CREATEPORTENTITY:-true}"
 monorepo_url="${INPUT_MONOREPOURL:-}"
@@ -68,6 +69,33 @@ add_link() {
   fi
 }
 
+# Resolve a GitHub team numeric ID from a provided name or slug (case-insensitive)
+resolve_github_team_id() {
+  [[ -z "${github_team_name}" ]] && return 1
+  local q="${github_team_name,,}"
+  local page=1 resp id count
+  while :; do
+    resp=$(curl -fsS \
+      -H "Authorization: token ${github_token}" \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "${git_url}/orgs/${org_name}/teams?per_page=100&page=${page}")
+
+    id=$(jq -r --arg q "$q" '[.[] | select((.name|ascii_downcase)==$q or (.slug|ascii_downcase)==$q) | .id] | first // empty' <<<"${resp}")
+    if [[ -n "${id}" ]]; then
+      echo "${id}"
+      return 0
+    fi
+
+    count=$(jq 'length' <<<"${resp}")
+    if [[ "${count}" -lt 100 || "${count}" -eq 0 ]]; then
+      break
+    fi
+    ((page++))
+  done
+  return 1
+}
+
 create_repository() {
   local who_resp userType http out
   who_resp=$(curl -fsS -H "Authorization: token ${github_token}" \
@@ -84,10 +112,17 @@ create_repository() {
       "${git_url}/user/repos")
   elif [[ "${userType}" == "Organization" ]]; then
     out=$(mktemp)
+    local payload
+    payload="{\"name\":\"${repository_name}\",\"private\":true"
+    if [[ -n "${github_team_id:-}" ]]; then
+      payload+=",\"team_id\":${github_team_id}"
+    fi
+    payload+="}"
+
     http=$(curl -sS -o "${out}" -w "%{http_code}" -X POST \
       -H "Authorization: token ${github_token}" \
       -H "Accept: application/json" \
-      -d "{\"name\":\"${repository_name}\",\"private\":true}" \
+      -d "${payload}" \
       "${git_url}/orgs/${org_name}/repos")
   else
     echo "Invalid user/org: ${org_name}" >&2; exit 1
@@ -207,8 +242,8 @@ push_to_repository() {
 
     local remote_url owner repo
     remote_url=$(git config --get remote.origin.url)
-    owner=$(printf "%s" "$remote_url" | sed -E 's#(git@|https?://)github.com[:/]|\.git$##; s#^[^/]+/##; s#/.*$##')
-    repo=$(printf "%s" "$remote_url" | sed -E 's#(git@|https?://)github.com[:/]|\.git$##; s#^[^/]+/##; s#^.*/##')
+    owner=$(printf "%s" "$remote_url" | sed -E 's#(git@|https?://)github.com[:/]|\\.git$##; s#^[^/]+/##; s#/.*$##')
+    repo=$(printf "%s" "$remote_url" | sed -E 's#(git@|https?://)github.com[:/]|\\.git$##; s#^[^/]+/##; s#^.*/##')
 
     local PR_PAYLOAD
     PR_PAYLOAD=$(jq -n --arg title "Scaffolded project in ${repo}" --arg head "${branch_name}" --arg base "main" '{title:$title, head:$head, base:$base}')
@@ -254,6 +289,16 @@ report_to_port() {
 main() {
   mask_secrets
   access_token=$(get_access_token || true)
+
+  # Resolve team (optional)
+  if [[ -n "${github_team_name}" ]]; then
+    github_team_id=$(resolve_github_team_id || true)
+    if [[ -n "${github_team_id:-}" ]]; then
+      send_log "Resolved GitHub team '${github_team_name}' to id ${github_team_id}"
+    else
+      send_log "Warning: Could not resolve GitHub team '${github_team_name}'. Proceeding without team assignment."
+    fi
+  fi
 
   if [[ -z "${monorepo_url}" || -z "${scaffold_directory}" ]]; then
     send_log "Creating a new repository: ${repository_name} 🏃"
