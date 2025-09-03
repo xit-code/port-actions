@@ -47,16 +47,6 @@ on:
         description: application id
         default: "platform-devsecops"
 
-      # Optional monorepo mode (if set, create PR instead of creating a new repo)
-      monorepoUrl:
-        required: false
-        description: application id
-        default: ""
-      scaffoldDirectory:
-        required: false
-        description: application id
-        default: ""
-
 permissions:
   contents: write
   pull-requests: write
@@ -86,10 +76,6 @@ jobs:
           portRunId: ${{ fromJson(inputs.port_context).runId }}
           blueprintIdentifier: githubRepository
           createPortEntity: "false"
-
-          # Monorepo mode (optional)
-          monorepoUrl: ${{ inputs.monorepoUrl }}
-          scaffoldDirectory: ${{ inputs.scaffoldDirectory }}
 
           # Artifactory / settings
           artifactoryUsername: ${{ secrets.ARTIFACTORY_USER }}
