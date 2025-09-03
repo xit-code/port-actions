@@ -69,22 +69,34 @@ add_link() {
 }
 
 create_repository() {
-  # Determine if org_name is a User or Organization
-  local resp
-  resp=$(curl -sS -H "Authorization: token ${github_token}" -H "Accept: application/json" -H "Content-Type: application/json" "${git_url}/users/${org_name}")
-  local userType
-  userType=$(jq -r '.type' <<<"${resp}")
+  local who_resp userType http out
+  who_resp=$(curl -fsS -H "Authorization: token ${github_token}" \
+    -H "Accept: application/json" "${git_url}/users/${org_name}")
+  userType=$(jq -r '.type' <<<"${who_resp}")
 
   if [[ "${userType}" == "User" ]]; then
-    curl -sS -X POST -H "Authorization: token ${github_token}" -H "X-GitHub-Api-Version: 2022-11-28" \
-      -d "{\n        \"name\": \"${repository_name}\", \"private\": true\n      }" \
-      "${git_url}/user/repos" >/dev/null
+    out=$(mktemp)
+    http=$(curl -sS -o "${out}" -w "%{http_code}" -X POST \
+      -H "Authorization: token ${github_token}" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -H "Accept: application/json" \
+      -d "{\"name\":\"${repository_name}\",\"private\":true}" \
+      "${git_url}/user/repos")
   elif [[ "${userType}" == "Organization" ]]; then
-    curl -sS -X POST -H "Authorization: token ${github_token}" \
-      -d "{\n        \"name\": \"${repository_name}\", \"private\": true\n      }" \
-      "${git_url}/orgs/${org_name}/repos" >/dev/null
+    out=$(mktemp)
+    http=$(curl -sS -o "${out}" -w "%{http_code}" -X POST \
+      -H "Authorization: token ${github_token}" \
+      -H "Accept: application/json" \
+      -d "{\"name\":\"${repository_name}\",\"private\":true}" \
+      "${git_url}/orgs/${org_name}/repos")
   else
-    echo "Invalid user type for ${org_name}" && exit 1
+    echo "Invalid user/org: ${org_name}" >&2; exit 1
+  fi
+
+  if [[ "${http}" != "201" ]]; then
+    echo "Failed to create repo ${org_name}/${repository_name} (HTTP ${http}). Response:" >&2
+    cat "${out}" >&2
+    exit 1
   fi
 }
 
