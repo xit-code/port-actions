@@ -131,6 +131,7 @@ jobs:
           operation: UPSERT
           identifier: "${{ steps.repo_name.outputs.value }}"
           title: "${{ inputs.system_id }} ${{ inputs.service_name }} Service"
+          team: '["${{ inputs.system_id }}"]'
           blueprint: "service"
           relations: |
             {
