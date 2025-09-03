@@ -1,0 +1,153 @@
+name: Scaffold via Maven Archetype
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        required: true
+        description: The name of the new service
+        type: string
+      # Archetype coordinates
+      archetypeGroupId:
+        description: "Archetype GroupId"
+        required: true
+        default: "pe.interbank.ads"
+      archetypeArtifactId:
+        description: "Archetype ArtifactId"
+        required: true
+        default: "ads-microservice-archetype-java"
+      archetypeVersion:
+        description: "Archetype Version"
+        required: true
+        default: "1.2.3"
+      port_context:
+        required: true
+        description: Includes the action's run id
+        type: string
+
+      # Project options (turned into -Dkey=value)
+      system_id:
+        required: true
+        description: application id
+        default: "mdp"
+      component_name:
+        required: true
+        description: application id
+        default: "pagopush-customer"
+      version:
+        required: true
+        description: application id
+        default: "1.0.0"
+      java_version:
+        required: true
+        description: application id
+        default: "17"
+      owner:
+        required: true
+        description: application id
+        default: "platform-devsecops"
+      description:
+        required: true
+        description: application id
+        default: "PagoPush Customer service"
+
+      # Optional monorepo mode (if set, create PR instead of creating a new repo)
+      monorepoUrl:
+        required: false
+        description: application id
+        default: ""
+      scaffoldDirectory:
+        required: false
+        description: application id
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    env:
+      ORG_NAME: xit-code
+      PORT_RUN_ID: ${{ fromJson(inputs.port_context).runId }}
+    steps:
+      - name: Checkout (only needed when using local actions)
+        uses: actions/checkout@v4
+
+      - name: Run mvn-archetype action (local)
+        uses: ./.github/actions/mvn-archetype
+        with:
+          # GitHub / repo
+          token: ${{ secrets.ORG_ADMIN_TOKEN }}
+          githubUrl: https://api.github.com
+          organizationName: ${{ env.ORG_NAME }}
+          repositoryName: ${{ inputs.service_name }}
+
+          # Port (optional)
+          portClientId: ${{ secrets.PORT_CLIENT_ID }}
+          portClientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          portRunId: ${{ fromJson(inputs.port_context).runId }}
+          blueprintIdentifier: githubRepository
+          createPortEntity: "false"
+
+          # Monorepo mode (optional)
+          monorepoUrl: ${{ inputs.monorepoUrl }}
+          scaffoldDirectory: ${{ inputs.scaffoldDirectory }}
+
+          # Artifactory / settings
+          artifactoryUsername: ${{ secrets.ARTIFACTORY_USER }}
+          artifactoryPassword: ${{ secrets.ARTIFACTORY_PASS }}
+          artifactoryHost: ${{ secrets.ARTIFACTORY_HOST }}
+          settingsTemplatePath: .github/config-files/settings.xml.tpl
+
+          # Archetype coords
+          archetypeGroupId: ${{ inputs.archetypeGroupId }}
+          archetypeArtifactId: ${{ inputs.archetypeArtifactId }}
+          archetypeVersion: ${{ inputs.archetypeVersion }}
+
+          # Flexible options → become -Dkey=value
+          mavenOptionsJson: >-
+            {
+              "groupId": "pe.interbank",
+              "application": "${{ inputs.system_id }}",
+              "service": "${{ inputs.component_name }}",
+              "version": "${{ inputs.version }}",
+              "javaVersion": "${{ inputs.java_version }}",
+              "serviceOwner": "${{ inputs.owner }}",
+              "serviceTitle": "${{ inputs.system_id }} ${{ inputs.component_name }} Service",
+              "serviceDescription": "${{ inputs.description }}",
+              "serviceRepository": "${{ inputs.system_id }}-${{ inputs.component_name }}-service",
+              "requiresDatabase": "no",
+              "requiresMessaging": "no",
+              "requiresService": "no",
+              "requiresStorage": "no"
+            }
+
+          # Extra mvn flags if you need them
+          mavenExtraArgs: ""
+
+      - name: Create Service in Port with Repository Relation
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: UPSERT
+          identifier: "${{ inputs.service_name }}_service"
+          title: "${{ inputs.service_name }} Service"
+          blueprint: "service"
+          relations: |
+            {
+              "repository": "${{ env.ORG_NAME }}/${{ inputs.service_name }}"
+            }
+
+      - name: Create a log message
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Finished scaffolding of service and repository: ${{ inputs.service_name }}"
