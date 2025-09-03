@@ -134,7 +134,7 @@ jobs:
           blueprint: "service"
           relations: |
             {
-              "repository": "${{ env.ORG_NAME }}/${{ inputs.service_name }}"
+              "repository": "${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.value }}"
             }
 
       - name: Create a log message
