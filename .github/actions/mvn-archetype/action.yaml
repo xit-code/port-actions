@@ -57,6 +57,18 @@ inputs:
     required: false
     description: "extra args"
     default: ""
+  artifactoryUsername:
+    required: false
+    description: "extra args"
+  artifactoryPassword:
+    required: false
+    description: "extra args"
+  artifactoryHost:
+    required: false
+    description: "extra args"
+  settingsTemplatePath:
+    required: false
+    description: "extra args"
 runs:
   using: docker
   image: Dockerfile
