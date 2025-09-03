@@ -1,0 +1,43 @@
+name: Port Maven Archetype Action
+description: GitHub action to create repositories templated with Maven Archetype Generate with Port integration
+author: xit-code
+inputs:
+  token:
+    description: "The GitHub Token to use to authenticate with the API with permissions to create repositories within the organization (supporting only PATs at this time)"
+    required: true
+  portClientId:
+    description: "The Port Client ID to use to authenticate with the API"
+    required: true
+  portClientSecret:
+    description: "The Port Client Secret to use to authenticate with the API"
+    required: true
+  blueprintIdentifier:
+    description: "The blueprint identifier to use to populate the Port"
+    required: true
+    default: "Service"
+  repositoryName:
+    description: "The name of the repository to create"
+    required: true
+  organizationName:
+    description: "The name of the organization to create the repository in"
+    required: true
+  mvnArchetypeArtifactId:
+    description: "The mvn archetype to use to populate the repository"
+    required: true
+  portUserInputs:
+    description: "Port user inputs to came from triggering the action"
+    required: true
+  githubURL:
+    description: "Git URL for self hosted version. Default value is api.github.com"
+    required: true
+    default: "https://api.github.com"
+  portRunId:
+    description: "Port run ID to came from triggering the action"
+    required: true
+  createPortEntity:
+    description: "Whether to create a Port entity for the repository"
+    required: false
+    default: "true"
+runs:
+  using: docker
+  image: Dockerfile
