@@ -53,6 +53,7 @@ jobs:
     env:
       ORG_NAME: xit-code
       PORT_RUN_ID: ${{ fromJson(inputs.port_context).runId }}
+      CODEIBK_VERSION: "1.0.0"
     steps:
       - name: Checkout (only needed when using local actions)
         uses: actions/checkout@v4
@@ -137,55 +138,6 @@ jobs:
           --service-owner "${{ inputs.owner }}" \
           --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Service" \
           --service-description "xddddd"
-
-      - name: Run mvn-archetype action (local)
-        uses: ./.github/actions/mvn-archetype
-        with:
-          # GitHub / repo
-          token: ${{ secrets.ORG_ADMIN_TOKEN }}
-          githubUrl: https://api.github.com
-          organizationName: ${{ env.ORG_NAME }}
-          repositoryName: ${{ steps.repo_name.outputs.value }}
-          githubTeamName: ${{ inputs.system_id }}
-
-          # Port (optional)
-          portClientId: ${{ secrets.PORT_CLIENT_ID }}
-          portClientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
-          portRunId: ${{ fromJson(inputs.port_context).runId }}
-          blueprintIdentifier: githubRepository
-          createPortEntity: "false"
-
-          # Artifactory / settings
-          artifactoryUsername: ${{ secrets.ARTIFACTORY_USER }}
-          artifactoryPassword: ${{ secrets.ARTIFACTORY_PASS }}
-          artifactoryHost: ${{ secrets.ARTIFACTORY_HOST }}
-          settingsTemplatePath: .github/config-files/settings.xml.tpl
-
-          # Archetype coords
-          archetypeGroupId: ${{ inputs.archetypeGroupId }}
-          archetypeArtifactId: ${{ inputs.archetypeArtifactId }}
-          archetypeVersion: ${{ inputs.archetypeVersion }}
-
-          # Flexible options → become -Dkey=value
-          mavenOptionsJson: >-
-            {
-              "groupId": "pe.interbank",
-              "application": "${{ inputs.system_id }}",
-              "service": "${{ inputs.service_name }}",
-              "version": "${{ inputs.version }}",
-              "javaVersion": "${{ inputs.java_version }}",
-              "serviceOwner": "${{ inputs.owner }}",
-              "serviceTitle": "${{ inputs.system_id }} ${{ inputs.service_name }} Service",
-              "serviceDescription": "xddddd",
-              "serviceRepository": "${{ inputs.system_id }}-${{ inputs.service_name }}-service",
-              "requiresDatabase": "no",
-              "requiresMessaging": "no",
-              "requiresService": "no",
-              "requiresStorage": "no"
-            }
-
-          # Extra mvn flags if you need them
-          mavenExtraArgs: ""
 
       - name: Create Service in Port with Repository Relation
         uses: port-labs/port-github-action@v1
