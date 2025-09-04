@@ -74,6 +74,70 @@ jobs:
           name="${name:0:100}"
           echo "value=$name" >> "$GITHUB_OUTPUT"
 
+      - name: Set up JDK 17 (for Maven)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+
+      - name: Install Maven
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y maven
+          mvn -v
+      
+      - name: Configure Maven settings.xml from template
+        env:
+          ARTIFACTORY_HOST: ${{ secrets.ARTIFACTORY_HOST }}
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.m2"
+          sed -e "s|{ARTIFACTORY_HOST}|${ARTIFACTORY_HOST}|g" \
+          -e "s|{ARTIFACTORY_USERNAME}|${ARTIFACTORY_USERNAME}|g" \
+          -e "s|{ARTIFACTORY_PASSWORD}|${ARTIFACTORY_PASSWORD}|g" \
+          .github/config-files/settings.xml.tpl > "$HOME/.m2/settings.xml"
+          echo "Maven settings written to $HOME/.m2/settings.xml"
+      
+      - name: Download codeibk release (binary + checksum)
+        env:
+          TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p bin
+          curl -fsSL -H "Authorization: token ${TOKEN}" \
+          -o bin/codeibk \
+          "https://github.com/xit-code/orchestrator/releases/download/${{ env.CODEIBK_VERSION }}/codeibk"
+          curl -fsSL -H "Authorization: token ${TOKEN}" \
+          -o bin/codeibk_linux_amd64.sha256 \
+          "https://github.com/xit-code/orchestrator/releases/download/${{ env.CODEIBK_VERSION }}/codeibk_linux_amd64.sha256"
+          chmod +x bin/codeibk
+
+      - name: Verify codeibk checksum
+        run: |
+          cd bin
+          sha256sum --check codeibk_linux_amd64.sha256
+      - name: Add codeibk to PATH
+        run: echo "$PWD/bin" >> "$GITHUB_PATH"
+      
+      - name: Scaffold via codeibk (java-microservice)
+        env:
+          CODEIBK_GITHUB_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          codeibk component create \
+          --preset java-microservice \
+          --org "${{ env.ORG_NAME }}" \
+          --team "${{ inputs.system_id }}" \
+          --application "${{ inputs.system_id }}" \
+          --service "${{ inputs.service_name }}" \
+          --service-owner "${{ inputs.owner }}" \
+          --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Service" \
+          --service-description "xddddd"
+
       - name: Run mvn-archetype action (local)
         uses: ./.github/actions/mvn-archetype
         with:
