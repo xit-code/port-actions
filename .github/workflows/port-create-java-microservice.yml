@@ -102,6 +102,19 @@ jobs:
           .github/config-files/settings.xml.tpl > "$HOME/.m2/settings.xml"
           echo "Maven settings written to $HOME/.m2/settings.xml"
 
+      - name: Cache Maven local repository (~/.m2/repository)
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: >-
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-codeibk-${{ env.CODEIBK_VERSION }}-
+            archetype-${{ inputs.archetypeGroupId }}-${{ inputs.archetypeArtifactId }}-${{ inputs.archetypeVersion }}-
+            settings-${{ hashFiles('.github/config-files/settings.xml.tpl') }}
+          restore-keys: |
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-codeibk-${{ env.CODEIBK_VERSION }}-
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-
+            m2-${{ runner.os }}-
+
       - name: Configure git author (for commits done by codeibk)
         shell: bash
         run: |
