@@ -188,6 +188,7 @@ jobs:
           --org "${{ env.ORG_NAME }}" \
           --team "${{ inputs.system_id }}" \
           --application "${{ inputs.system_id }}" \
+          --java-version "${{ inputs.java_version }}" \
           --service "${{ inputs.service_name }}" \
           --service-owner "${{ inputs.owner }}" \
           --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Service" \
