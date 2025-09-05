@@ -63,7 +63,7 @@ jobs:
           set -euo pipefail
           sys='${{ inputs.system_id }}'
           svc='${{ inputs.service_name }}'
-          name="${sys}-${svc}-service"
+          name="${sys}-${svc}-web-test"
           # lowercase + sanitize to [a-z0-9-], collapse repeats, trim edges
           name="$(echo "$name" \
             | tr '[:upper:]' '[:lower:]' \
