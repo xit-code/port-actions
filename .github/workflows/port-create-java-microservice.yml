@@ -55,22 +55,32 @@ jobs:
           runId: ${{ env.PORT_RUN_ID }}
           logMessage: "Checked out repository."
 
-      # NEW: compose <system_id>-<service_name>-service (lowercase, kebab-case, max 100 chars)
       - name: Compose repository name
         id: repo_name
         shell: bash
         run: |
           set -euo pipefail
+
           sys='${{ inputs.system_id }}'
           svc='${{ inputs.service_name }}'
-          name="${sys}-${svc}-service"
-          # lowercase + sanitize to [a-z0-9-], collapse repeats, trim edges
-          name="$(echo "$name" \
+
+          # repository_name: <system_id>-<service_name>-service (kebab, <=100 chars)
+          repo_name="${sys}-${svc}-service"
+          repo_name="$(echo "$repo_name" \
             | tr '[:upper:]' '[:lower:]' \
             | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
-          # limit to 100 chars (GitHub repo name limit)
-          name="${name:0:100}"
-          echo "value=$name" >> "$GITHUB_OUTPUT"
+          repo_name="${repo_name:0:100}"
+          echo "repository_name=$repo_name" >> "$GITHUB_OUTPUT"
+
+          # component_title: <SYSTEM_ID_UPPER> <Service Name Title> Service
+          # e.g., dso + payments-history -> "DSO Payments History Service"
+          sys_uc="${sys^^}"
+          svc_title="$(echo "$svc" | awk -F- '{
+            for(i=1;i<=NF;i++){ $i = toupper(substr($i,1,1)) tolower(substr($i,2)) }
+            print
+          }' OFS=" ")"
+          title="$sys_uc $svc_title Service"
+          echo "component_title=$title" >> "$GITHUB_OUTPUT"
 
       - name: Port log — repo name composed
         uses: port-labs/port-github-action@v1
@@ -80,7 +90,7 @@ jobs:
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
           runId: ${{ env.PORT_RUN_ID }}
-          logMessage: "Composed repo name: ${{ steps.repo_name.outputs.value }}"
+          logMessage: "Composed repo name: ${{ steps.repo_name.outputs.repository_name }}"
 
       - name: Set up JDK 21 (for Maven)
         uses: actions/setup-java@v4
@@ -191,7 +201,7 @@ jobs:
           --java-version "${{ inputs.java_version }}" \
           --service "${{ inputs.service_name }}" \
           --service-owner "${{ inputs.owner }}" \
-          --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Service" \
+          --service-title "${{ steps.repo_name.outputs.component_title }}" \
           --service-description "xddddd"
 
       - name: Port log — codeibk scaffold complete
@@ -202,7 +212,7 @@ jobs:
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
           runId: ${{ env.PORT_RUN_ID }}
-          logMessage: "codeibk scaffolding done for repo: ${{ steps.repo_name.outputs.value }}"
+          logMessage: "codeibk scaffolding done for repo: ${{ steps.repo_name.outputs.repository_name }}"
 
       - name: Create Service in Port with Repository Relation
         uses: port-labs/port-github-action@v1
@@ -211,13 +221,13 @@ jobs:
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           baseUrl: https://api.getport.io
           operation: UPSERT
-          identifier: "${{ steps.repo_name.outputs.value }}"
-          title: "${{ inputs.system_id }} ${{ inputs.service_name }} Service"
+          identifier: "${{ steps.repo_name.outputs.repository_name }}"
+          title: "${{ steps.repo_name.outputs.component_title }}"
           team: '["${{ inputs.system_id }}"]'
           blueprint: "service"
           relations: |
             {
-              "repository": "${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.value }}"
+              "repository": "${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.repository_name }}"
             }
 
       - name: Port log — Port service upserted
@@ -228,7 +238,7 @@ jobs:
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
           runId: ${{ env.PORT_RUN_ID }}
-          logMessage: "Port service upserted and linked to repo: ${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.value }}"
+          logMessage: "Port service upserted and linked to repo: ${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.repository_name }}"
 
       - name: Port log — Workflow SUCCEEDED
         if: success()
@@ -239,7 +249,7 @@ jobs:
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
           runId: ${{ env.PORT_RUN_ID }}
-          logMessage: "Workflow SUCCEEDED for repo: ${{ steps.repo_name.outputs.value }}"
+          logMessage: "Workflow SUCCEEDED for repo: ${{ steps.repo_name.outputs.repository_name }}"
 
       - name: Port log — Workflow FAILED
         if: failure()
