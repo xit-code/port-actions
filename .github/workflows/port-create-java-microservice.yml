@@ -102,6 +102,19 @@ jobs:
           .github/config-files/settings.xml.tpl > "$HOME/.m2/settings.xml"
           echo "Maven settings written to $HOME/.m2/settings.xml"
 
+      - name: Configure git author (for commits done by codeibk)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use the GitHub Actions bot identity by default
+          git config --global user.name  "${GITHUB_ACTOR:-github-actions[bot]}"
+          if [[ "${GITHUB_ACTOR:-github-actions[bot]}" == "github-actions[bot]" ]]; then
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          else
+            git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          fi
+          git config --global init.defaultBranch main
+
       - name: Download codeibk release (binary + checksum) with gh
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }} # PAT with access to xit-code/orchestrator
