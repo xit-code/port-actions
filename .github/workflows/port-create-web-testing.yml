@@ -22,7 +22,7 @@ on:
         description: application id
         default: "1.0.0"
       java_version:
-        required: true
+        required: false
         description: application id
         default: "17"
       owner:
