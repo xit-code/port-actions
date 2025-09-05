@@ -85,7 +85,7 @@ jobs:
       - name: Set up JDK 21 (for Maven)
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: corretto
           java-version: "21"
 
       - name: Install Maven
