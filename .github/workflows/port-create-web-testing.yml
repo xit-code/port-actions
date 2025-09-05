@@ -63,7 +63,7 @@ jobs:
           set -euo pipefail
           sys='${{ inputs.system_id }}'
           svc='${{ inputs.service_name }}'
-          name="${sys}-${svc}-web-test"
+          name="${sys}-${svc}-test-web"
           # lowercase + sanitize to [a-z0-9-], collapse repeats, trim edges
           name="$(echo "$name" \
             | tr '[:upper:]' '[:lower:]' \
@@ -192,7 +192,7 @@ jobs:
           --version 0.0.1-SNAPSHOT \
           --service-repository "${{ steps.repo_name.outputs.value }}" \
           --service-owner "${{ inputs.owner }}" \
-          --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Web Test" \
+          --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Test Web" \
           --service-description "El repositorio contendrá pruebas funcionales a nivel .... de la aplicación ... ."
 
       - name: Port log — codeibk scaffold complete
@@ -213,7 +213,7 @@ jobs:
           baseUrl: https://api.getport.io
           operation: UPSERT
           identifier: "${{ steps.repo_name.outputs.value }}"
-          title: "${{ inputs.system_id }} ${{ inputs.service_name }} Service"
+          title: "${{ inputs.system_id }} ${{ inputs.service_name }} Test Web"
           team: '["${{ inputs.system_id }}"]'
           blueprint: "automated_testing"
           relations: |
@@ -251,4 +251,4 @@ jobs:
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
           runId: ${{ env.PORT_RUN_ID }}
-          logMessage: "Workflow FAILED during scaffolding of service: ${{ inputs.service_name }}"
+          logMessage: "Workflow FAILED during scaffolding of automated_test: ${{ inputs.service_name }}"
