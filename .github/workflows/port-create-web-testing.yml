@@ -190,7 +190,7 @@ jobs:
           --sigla-app "${{ inputs.system_id }}" \
           --functional-purpose "${{ inputs.service_name }}" \
           --version 0.0.1-SNAPSHOT \
-          --service-repository ${{ steps.repo_name.outputs.value }}" \
+          --service-repository "${{ steps.repo_name.outputs.value }}" \
           --service-owner "${{ inputs.owner }}" \
           --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Web Test" \
           --service-description "El repositorio contendrá pruebas funcionales a nivel .... de la aplicación ... ."
