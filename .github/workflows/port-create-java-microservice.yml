@@ -109,6 +109,30 @@ jobs:
           .github/config-files/settings.xml.tpl > "$HOME/.m2/settings.xml"
           echo "Maven settings written to $HOME/.m2/settings.xml"
 
+      - name: Cache Maven local repository (~/.m2/repository)
+        id: m2cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: >-
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-codeibk-${{ env.CODEIBK_VERSION }}-
+            preset-java-microservice-
+            settings-${{ hashFiles('.github/config-files/settings.xml.tpl') }}
+          restore-keys: |
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-codeibk-${{ env.CODEIBK_VERSION }}-
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-
+            m2-${{ runner.os }}-
+
+      - name: Port log — Maven cache prepared
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Maven cache prepared (hit=${{ steps.m2cache.outputs.cache-hit }})"
+
       - name: Configure git author (for commits done by codeibk)
         shell: bash
         run: |
