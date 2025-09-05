@@ -58,6 +58,16 @@ jobs:
       - name: Checkout (only needed when using local actions)
         uses: actions/checkout@v4
 
+      - name: Port log — checked out repository
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Checked out repository."
+
       # NEW: compose <system_id>-<service_name>-service (lowercase, kebab-case, max 100 chars)
       - name: Compose repository name
         id: repo_name
@@ -75,11 +85,21 @@ jobs:
           name="${name:0:100}"
           echo "value=$name" >> "$GITHUB_OUTPUT"
 
-      - name: Set up JDK 17 (for Maven)
+      - name: Port log — repo name composed
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Composed repo name: ${{ steps.repo_name.outputs.value }}"
+
+      - name: Set up JDK 21 (for Maven)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Install Maven
         run: |
@@ -143,6 +163,16 @@ jobs:
           ls -l bin
           chmod +x bin/codeibk
 
+      - name: Port log — codeibk downloaded
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Downloaded codeibk binary & checksum."
+
       - name: Verify codeibk checksum
         run: |
           cd bin
@@ -165,6 +195,16 @@ jobs:
           --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Service" \
           --service-description "xddddd"
 
+      - name: Port log — codeibk scaffold complete
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "codeibk scaffolding done for repo: ${{ steps.repo_name.outputs.value }}"
+
       - name: Create Service in Port with Repository Relation
         uses: port-labs/port-github-action@v1
         with:
@@ -181,7 +221,7 @@ jobs:
               "repository": "${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.value }}"
             }
 
-      - name: Create a log message
+      - name: Port log — Port service upserted
         uses: port-labs/port-github-action@v1
         with:
           clientId: ${{ secrets.PORT_CLIENT_ID }}
@@ -189,4 +229,26 @@ jobs:
           baseUrl: https://api.getport.io
           operation: PATCH_RUN
           runId: ${{ env.PORT_RUN_ID }}
-          logMessage: "Finished scaffolding of service and repository: ${{ inputs.service_name }}"
+          logMessage: "Port service upserted and linked to repo: ${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.value }}"
+
+      - name: Port log — Workflow SUCCEEDED
+        if: success()
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Workflow SUCCEEDED for repo: ${{ steps.repo_name.outputs.value }}"
+
+      - name: Port log — Workflow FAILED
+        if: failure()
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Workflow FAILED during scaffolding of service: ${{ inputs.service_name }}"
