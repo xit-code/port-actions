@@ -1,0 +1,253 @@
+name: Scaffold via Maven Archetype API Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        required: true
+        description: The name of the new service
+        type: string
+      port_context:
+        required: true
+        description: Includes the action's run id
+        type: string
+
+      # Project options (turned into -Dkey=value)
+      system_id:
+        required: true
+        description: application id
+        default: "mdp"
+      version:
+        required: true
+        description: application id
+        default: "1.0.0"
+      java_version:
+        required: false
+        description: application id
+        default: "17"
+      owner:
+        required: true
+        description: application id
+        default: "platform-devsecops"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    env:
+      ORG_NAME: xit-code
+      PORT_RUN_ID: ${{ fromJson(inputs.port_context).runId }}
+      CODEIBK_VERSION: "1.0.1"
+    steps:
+      - name: Checkout (only needed when using local actions)
+        uses: actions/checkout@v4
+
+      - name: Port log — checked out repository
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Checked out repository."
+
+      # NEW: compose <system_id>-<service_name>-service (lowercase, kebab-case, max 100 chars)
+      - name: Compose repository name
+        id: repo_name
+        shell: bash
+        run: |
+          set -euo pipefail
+          sys='${{ inputs.system_id }}'
+          svc='${{ inputs.service_name }}'
+          name="${sys}-${svc}-test-api"
+          # lowercase + sanitize to [a-z0-9-], collapse repeats, trim edges
+          name="$(echo "$name" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+          # limit to 100 chars (GitHub repo name limit)
+          name="${name:0:100}"
+          echo "value=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Port log — repo name composed
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Composed repo name: ${{ steps.repo_name.outputs.value }}"
+
+      - name: Set up JDK 21 (for Maven)
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: "21"
+
+      - name: Install Maven
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y maven
+          mvn -v
+
+      - name: Configure Maven settings.xml from template
+        env:
+          ARTIFACTORY_HOST: ${{ secrets.ARTIFACTORY_HOST }}
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USER }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.m2"
+          sed -e "s|{ARTIFACTORY_HOST}|${ARTIFACTORY_HOST}|g" \
+          -e "s|{ARTIFACTORY_USERNAME}|${ARTIFACTORY_USERNAME}|g" \
+          -e "s|{ARTIFACTORY_PASSWORD}|${ARTIFACTORY_PASSWORD}|g" \
+          .github/config-files/settings.xml.tpl > "$HOME/.m2/settings.xml"
+          echo "Maven settings written to $HOME/.m2/settings.xml"
+
+      - name: Cache Maven local repository (~/.m2/repository)
+        id: m2cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: >-
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-codeibk-${{ env.CODEIBK_VERSION }}-
+            preset-api-testing-
+            settings-${{ hashFiles('.github/config-files/settings.xml.tpl') }}
+          restore-keys: |
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-codeibk-${{ env.CODEIBK_VERSION }}-
+            m2-${{ runner.os }}-java-${{ inputs.java_version }}-
+            m2-${{ runner.os }}-
+
+      - name: Port log — Maven cache prepared
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Maven cache prepared (hit=${{ steps.m2cache.outputs.cache-hit }})"
+
+      - name: Configure git author (for commits done by codeibk)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use the GitHub Actions bot identity by default
+          git config --global user.name  "${GITHUB_ACTOR:-github-actions[bot]}"
+          if [[ "${GITHUB_ACTOR:-github-actions[bot]}" == "github-actions[bot]" ]]; then
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          else
+            git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          fi
+          git config --global init.defaultBranch main
+
+      - name: Download codeibk release (binary + checksum) with gh
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }} # PAT with access to xit-code/orchestrator
+          TARGET_REPO: ${{ env.ORG_NAME }}/orchestrator
+        run: |
+          set -euo pipefail
+          mkdir -p bin
+          gh release download "${{ env.CODEIBK_VERSION }}" \
+            --repo "$TARGET_REPO" \
+            --pattern "codeibk" \
+            --pattern "codeibk_linux_amd64.sha256" \
+            --dir bin
+          ls -l bin
+          chmod +x bin/codeibk
+
+      - name: Port log — codeibk downloaded
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Downloaded codeibk binary & checksum."
+
+      - name: Verify codeibk checksum
+        run: |
+          cd bin
+          sha256sum --check codeibk_linux_amd64.sha256
+      - name: Add codeibk to PATH
+        run: echo "$PWD/bin" >> "$GITHUB_PATH"
+
+      - name: Scaffold via codeibk (api-testing)
+        env:
+          CODEIBK_GITHUB_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          codeibk component create \
+          --preset api-testing \
+          --org "${{ env.ORG_NAME }}" \
+          --team "${{ inputs.system_id }}" \
+          --sigla-app "${{ inputs.system_id }}" \
+          --functional-purpose "${{ inputs.service_name }}" \
+          --version 0.0.1-SNAPSHOT \
+          --service-owner "${{ inputs.owner }}" \
+          --service-title "${{ inputs.system_id }} ${{ inputs.service_name }} Test API" \
+          --service-description "El repositorio contendrá pruebas…"
+
+      - name: Port log — codeibk scaffold complete
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "codeibk scaffolding done for repo: ${{ steps.repo_name.outputs.value }}"
+
+      - name: Create Automated Testing in Port with Repository Relation
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: UPSERT
+          identifier: "${{ steps.repo_name.outputs.value }}"
+          title: "${{ inputs.system_id }} ${{ inputs.service_name }} Test API"
+          team: '["${{ inputs.system_id }}"]'
+          blueprint: "automated_testing"
+          relations: |
+            {
+              "repository": "${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.value }}"
+            }
+
+      - name: Port log — Port Automated Testing upserted
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Port Automated Testing upserted and linked to repo: ${{ env.ORG_NAME }}/${{ steps.repo_name.outputs.value }}"
+
+      - name: Port log — Workflow SUCCEEDED
+        if: success()
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Workflow SUCCEEDED for repo: ${{ steps.repo_name.outputs.value }}"
+
+      - name: Port log — Workflow FAILED
+        if: failure()
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          baseUrl: https://api.getport.io
+          operation: PATCH_RUN
+          runId: ${{ env.PORT_RUN_ID }}
+          logMessage: "Workflow FAILED during scaffolding of automated_test: ${{ inputs.service_name }}"
