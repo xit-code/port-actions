@@ -79,15 +79,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-
+          java-version: "17"
 
       - name: Install Maven
         run: |
           sudo apt-get update -y
           sudo apt-get install -y maven
           mvn -v
-      
+
       - name: Configure Maven settings.xml from template
         env:
           ARTIFACTORY_HOST: ${{ secrets.ARTIFACTORY_HOST }}
@@ -102,19 +101,20 @@ jobs:
           -e "s|{ARTIFACTORY_PASSWORD}|${ARTIFACTORY_PASSWORD}|g" \
           .github/config-files/settings.xml.tpl > "$HOME/.m2/settings.xml"
           echo "Maven settings written to $HOME/.m2/settings.xml"
-      
-      - name: Download codeibk release (binary + checksum)
+
+      - name: Download codeibk release (binary + checksum) with gh
         env:
-          TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }} # PAT with access to xit-code/orchestrator
+          TARGET_REPO: ${{ env.ORG_NAME }}/orchestrator
         run: |
           set -euo pipefail
           mkdir -p bin
-          curl -fsSL -H "Authorization: token ${TOKEN}" \
-          -o bin/codeibk \
-          "https://github.com/xit-code/orchestrator/releases/download/${{ env.CODEIBK_VERSION }}/codeibk"
-          curl -fsSL -H "Authorization: token ${TOKEN}" \
-          -o bin/codeibk_linux_amd64.sha256 \
-          "https://github.com/xit-code/orchestrator/releases/download/${{ env.CODEIBK_VERSION }}/codeibk_linux_amd64.sha256"
+          gh release download "${{ env.CODEIBK_VERSION }}" \
+            --repo "$TARGET_REPO" \
+            --pattern "codeibk" \
+            --pattern "codeibk_linux_amd64.sha256" \
+            --dir bin
+          ls -l bin
           chmod +x bin/codeibk
 
       - name: Verify codeibk checksum
@@ -123,7 +123,7 @@ jobs:
           sha256sum --check codeibk_linux_amd64.sha256
       - name: Add codeibk to PATH
         run: echo "$PWD/bin" >> "$GITHUB_PATH"
-      
+
       - name: Scaffold via codeibk (java-microservice)
         env:
           CODEIBK_GITHUB_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
